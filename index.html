@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Cherry Blossom Tree</title>
+    <style>
+        :root {
+            color-scheme: light;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #ffd4e8;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #reload-btn {
+            position: fixed;
+            top: 2px;
+            right: 2px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.15);
+            color: rgba(255, 255, 255, 0.8);
+            padding: 4px 6px;
+            font-size: 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            transition: background 0.2s, color 0.2s;
+        }
+        #reload-btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            color: rgba(255, 255, 255, 1);
+    </style>
+</head>
+<body>
+    <canvas id="scene"></canvas>
+    <button id="reload-btn" onclick="window.location.reload()">↻</button>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module">
+        import * as THREE from "three";
+        import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+        import { createTree } from "./tree.js";
+        import { createBlossoms } from "./blossoms.js";
+        import { createPetals, update as updatePetals } from "./petals.js";
+        import { createGround } from "./ground.js";
+
+        // ── Scene setup ──────────────────────────────────────────────
+        const canvas = document.getElementById("scene");
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffd4e8);
+        scene.fog = new THREE.Fog(0xffd4e8, 60, 120);
+
+        const camera = new THREE.PerspectiveCamera(
+            50, window.innerWidth / window.innerHeight, 0.1, 200
+        );
+        camera.position.set(12, 10, 15);
+        camera.lookAt(0, 4, 0);
+
+        const controls = new OrbitControls(camera, canvas);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.minDistance = 5;
+        controls.maxDistance = 40;
+        controls.maxPolarAngle = Math.PI / 2.05;
+        controls.target.set(0, 4, 0);
+
+        // ── Lighting ─────────────────────────────────────────────────
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfff4e0, 1.8);
+        sunLight.position.set(20, 30, 15);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.set(2048, 2048);
+        sunLight.shadow.camera.near = 1;
+        sunLight.shadow.camera.far = 80;
+        sunLight.shadow.camera.left = -30;
+        sunLight.shadow.camera.right = 30;
+        sunLight.shadow.camera.top = 30;
+        sunLight.shadow.camera.bottom = -30;
+        scene.add(sunLight);
+
+        const hemiLight = new THREE.HemisphereLight(0xffd4e8, 0x556b2f, 0.4);
+        scene.add(hemiLight);
+
+        // ── Import and instantiate modules ───────────────────────────
+        const ground = createGround();
+        scene.add(ground);
+
+        const tree = createTree();
+        tree.position.set(5, 0, 0);
+        scene.add(tree);
+
+        const blossoms = createBlossoms();
+        blossoms.position.set(5, 0, 0);
+        scene.add(blossoms);
+
+        const petals = createPetals();
+        scene.add(petals);
+
+        // ── Animation loop ───────────────────────────────────────────
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            // Update falling petals
+            updatePetals(petals, delta);
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // ── Resize handler ───────────────────────────────────────────
+        window.addEventListener("resize", () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // ── SDK: register no-op filter (peer-only, no incoming messages) ──
+        try {
+            const { initWebWidget } = await import("/apps/kilroy.utils/lib/kilroy/js/webwidget_sdk.js");
+            const sdk = initWebWidget({});
+            await sdk.ready;
+            // Register a filter that matches nothing — this widget receives no incoming messages.
+            await sdk.setMessageFilters(["(?!)"]);
+        } catch (err) {
+            // SDK unavailable in standalone browser; ignore gracefully.
+            console.warn("WebWidget SDK not available (standalone mode):", err);
+        }
+    </script>
+</body>
+</html>
